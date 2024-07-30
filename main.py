@@ -1,13 +1,22 @@
 from fastapi import FastAPI, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from db.engine import Base, engine, get_db, SessionLocal
-
+from db.engine import Base, engine, get_db
 from db.models import Analysis
+
+from hezar.models import Model
+from fastapi.middleware.cors import CORSMiddleware
+model = Model.load("hezarai/bert-fa-sentiment-dksf")
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 async def init_tables():
@@ -23,18 +32,16 @@ class TextRequest(BaseModel):
 async def process_text(request: TextRequest, db: AsyncSession = Depends(get_db)):
     input_text = request.text
 
-    processed_text = input_text.upper()  # Example processing
-
+    res = model.predict([input_text])[0][0]
+    print(res)
     new_record = Analysis(
         text=input_text,
-        result=processed_text,
-        accuracy=100  # Example accuracy value
+        result=res['label'],
+        accuracy=res['score']
     )
 
     async with db.begin():
         db.add(new_record)
         await db.flush()
 
-    return {"processed_text": processed_text}
-
-# test
+    return {"processed_text": res['label'],"accuracy" : res['score']}
