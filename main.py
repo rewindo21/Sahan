@@ -36,3 +36,5 @@ async def process_text(request: TextRequest, db: AsyncSession = Depends(get_db))
         await db.flush()
 
     return {"processed_text": processed_text}
+
+# test
