@@ -46,7 +46,3 @@ async def process_text(request: TextRequest, db: AsyncSession = Depends(get_db))
 
     return {"processed_text": res['label'],"accuracy" : res['score']}
 
-
-async def main():
-    await init_tables()
-
