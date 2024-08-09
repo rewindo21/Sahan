@@ -6,7 +6,9 @@ from db.models import Analysis
 
 from hezar.models import Model
 from fastapi.middleware.cors import CORSMiddleware
-model = Model.load("hezarai/bert-fa-sentiment-dksf")
+import logging
+from http.client import HTTPException
+
 
 app = FastAPI()
 
@@ -17,6 +19,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+model = Model.load("hezarai/bert-fa-sentiment-dksf")
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 @app.on_event("startup")
 async def init_tables():
@@ -32,16 +39,22 @@ class TextRequest(BaseModel):
 async def process_text(request: TextRequest, db: AsyncSession = Depends(get_db)):
     input_text = request.text
 
-    res = model.predict([input_text])[0][0]
-    print(res)
-    new_record = Analysis(
-        text=input_text,
-        result=res['label'],
-        accuracy=res['score']
-    )
+    try:
+        res = model.predict([input_text])[0][0]
+        logger.info(f"Prediction result: {res}")
 
-    async with db.begin():
-        db.add(new_record)
-        await db.flush()
+        new_record = Analysis(
+            text=input_text,
+            result=res['label'],
+            accuracy=res['score']
+        )
 
-    return {"processed_text": res['label'],"accuracy" : res['score']}
+        async with db.begin():
+            db.add(new_record)
+            await db.flush()
+
+        return {"processed_text": res['label'], "accuracy": res['score']}
+
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
